@@ -1,9 +1,30 @@
 
 import csv
+import nltk
 from rich.console import Console
 from rich.table import Table
+from collections import Counter
 
 console = Console()
+
+#-------------------------Download and process corpus-------------------------
+
+nltk.download('gutenberg')
+from nltk.corpus import gutenberg
+
+# Combine all words in Gutenberg corpus
+corpus = " ".join(gutenberg.words()).lower()
+
+# Remove non-alphabetic characters
+import re
+corpus = re.sub(r'[^a-z\s]', '', corpus)
+
+from collections import Counter
+
+# Bigram frequencies
+bigram_freq = Counter(corpus[i:i+2] for i in range(len(corpus) - 1))
+# Trigram frequencies
+trigram_freq = Counter(corpus[i:i+3] for i in range(len(corpus) - 2))
 
 # ------------------------ GLOBAL CACHE ------------------------
 _DICTIONARY_CACHE = None
@@ -50,6 +71,26 @@ def is_pangram(word: str, letters_set: set) -> bool:
     """
     return all(letter in word for letter in letters_set)
 
+def bigram_score(word, bigram_freq):
+    """
+    Calculate a score for the word based on bigram frequencies.
+    """
+    return sum(bigram_freq.get(word[i:i+2], 0) for i in range(len(word) - 1))
+
+def trigram_score(word, trigram_freq):
+    """
+    Calculate a score for the word based on trigram frequencies.
+    """
+    return sum(trigram_freq.get(word[i:i+3], 0) for i in range(len(word) - 2))
+
+def combined_score(word, bigram_freq, trigram_freq, weight=0.5):
+    """
+    Combine bigram and trigram scores with a weighted average.
+    """
+    score_b = bigram_score(word, bigram_freq)
+    score_t = trigram_score(word, trigram_freq)
+    return score_b * weight + score_t * (1 - weight)
+
 def compute_score(word: str, letters_set: set) -> int:
     """
     Compute a NYT Spelling Bee style score:
@@ -85,6 +126,33 @@ def gather_statistics(valid_words, letters_set):
         "avg_length": avg_length,
         "total_points": total_points,
     }
+def is_valid_for_spelling_bee(word, letters, center_letter):
+    """
+    Check if a word is valid for Spelling Bee:
+    - Contains the center letter.
+    - Only uses the provided 7 letters.
+    - Has a minimum length of 4.
+    """
+    return (
+        len(word) >= 4 and
+        center_letter in word and
+        all(c in letters for c in word)
+    )
+
+def find_valid_words(letters, center_letter, dictionary, bigram_freq, trigram_freq):
+    """
+    Find valid Spelling Bee words and rank them by combined score.
+    """
+    candidates = [
+        word for word in dictionary
+        if is_valid_for_spelling_bee(word, letters, center_letter)
+    ]
+    # Score and sort candidates
+    scored_candidates = [
+        (word, combined_score(word, bigram_freq, trigram_freq))
+        for word in candidates
+    ]
+    return sorted(scored_candidates, key=lambda x: x[1], reverse=True)
 
 def find_spelling_bee_words(
     dictionary_path: str,
@@ -253,9 +321,32 @@ def interactive_mode():
             console.print("\n[bold green]Goodbye![/bold green]")
             break
 
+#-------------------------Interactive Mode II --------------------------#
+
+def interactive_spelling_bee_solver():
+    word_list = get_dictionary("words_alpha.txt")
+    # Get input from the user
+    letters_input = input("Enter all 7 letters (no spaces): ").strip().lower()
+    center_letter = input("Enter the center letter: ").strip().lower()
+
+    # Convert letters to a set
+    letters = set(letters_input)
+
+    # Find and rank valid words
+    results = find_valid_words(letters, center_letter, word_fondlist, bigram_freq, trigram_freq)
+
+    # Display top results
+    print("\nTop valid words:")
+    for word, score in results[:20]:  # Display top 20
+        print(f"{word} (score={score:.2f})")
+
+# ------------------------ MAIN ----------------------------------------#
 def main():
     # Just run interactive mode in this example
-    interactive_mode()
+    # interactive_mode()
+
+    # Just run interactive_spelling_bee_solver()
+    interactive_spelling_bee_solver()
 
 if __name__ == "__main__":
     main()
