@@ -3,6 +3,9 @@ from enhanced_spelling_bee import find_spelling_bee_words, print_results, export
 
 console = Console()
 
+def get_user_input(prompt, default):
+    return console.input(f"{prompt} [default: {default}]: ").strip() or default
+
 def interactive_mode():
     """
     Runs an interactive session to collect user inputs and display Spelling Bee results.
@@ -17,12 +20,12 @@ def interactive_mode():
     default_max_length = 12
     default_must_contain = ""
 
-    dictionary_path = console.input(f"Enter path to dictionary file [default: {default_dictionary_path}]: ") or default_dictionary_path
-    center = console.input(f"\nEnter the center letter (required) [default: {default_center}]: ").strip().lower() or default_center
-    other_letters = console.input(f"Enter the other 6 letters (required) [default: {default_other_letters}]: ").strip().lower() or default_other_letters
-    min_length = int(console.input(f"Minimum word length? [default: {default_min_length}]: ").strip() or default_min_length)
-    max_length = int(console.input(f"Maximum word length? [0 = no limit] [default: {default_max_length}]: ").strip() or default_max_length)
-    must_contain = console.input(f"Must contain substring (optional) [default: {default_must_contain}]: ").strip().lower() or default_must_contain
+    dictionary_path = get_user_input("Enter path to dictionary file", default_dictionary_path)
+    center = get_user_input("Enter the center letter (required)", default_center).lower()
+    other_letters = get_user_input("Enter the other 6 letters (required)", default_other_letters).lower()
+    min_length = int(get_user_input("Minimum word length?", default_min_length))
+    max_length = int(get_user_input("Maximum word length? [0 = no limit]", default_max_length))
+    must_contain = get_user_input("Must contain substring (optional)", default_must_contain).lower()
 
     while True:
         valid_words, letters_set = find_spelling_bee_words(
@@ -36,10 +39,10 @@ def interactive_mode():
 
         print_results(valid_words, letters_set, dictionary_path, min_length, max_length, must_contain, center)
 
-        if console.input("Export to CSV? (y/n) [default: n]: ").strip().lower().startswith("y"):
-            csv_path = console.input("Enter CSV file name [default: results.csv]: ").strip() or "results.csv"
+        if get_user_input("Export to CSV? (y/n)", "n").lower().startswith("y"):
+            csv_path = get_user_input("Enter CSV file name", "results.csv")
             export_to_csv(valid_words, letters_set, csv_path)
 
-        if console.input("\nDo you want to run another query? (y/n) [default: y]: ").strip().lower().startswith("n"):
+        if get_user_input("Do you want to run another query? (y/n)", "y").lower().startswith("n"):
             console.print("\n[bold green]Goodbye![/bold green]")
             break
