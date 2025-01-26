@@ -1,24 +1,18 @@
+import tkinter as tk
+from tkinter import messagebox
+from spelling_bee.cli import run_spelling_bee_query, export_to_csv, SpellingBeeCLI
+from spelling_bee.solver import gather_statistics
 import logging
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        logging.FileHandler("gui.log"),
+        logging.FileHandler("gui_spelling_bee.log"),
         logging.StreamHandler()
     ]
 )
-
-try:
-    import tkinter as tk
-    from tkinter import messagebox
-except ImportError as e:
-    print("tkinter is not installed or configured correctly. Please ensure it is installed.")
-    raise e
-
-from spelling_bee.cli import run_spelling_bee_query, export_to_csv
-from spelling_bee.solver import gather_statistics
 
 class SpellingBeeGUI:
     def __init__(self):
@@ -29,6 +23,7 @@ class SpellingBeeGUI:
             import tkinter as tk
             from tkinter import messagebox
         except ImportError as e:
+            logging.error("tkinter is not installed or configured correctly. Please ensure it is installed.")
             print("tkinter is not installed or configured correctly. Please ensure it is installed.")
             raise e
 
@@ -225,19 +220,16 @@ class SpellingBeeGUI:
         """
         Handles the 'Check Words' button click event.
         """
-        logging.debug("Check Words button clicked.")
         center = self.entry_center.get().strip().lower()
         other_letters = self.entry_other_letters.get().strip().lower()
         min_length = int(self.entry_min_length.get().strip() or 4)
-        max_length = int(self.entry_max_length.get().strip() or 10)
+        max_length = int(self.entry_max_length.get().strip() or 0)
         must_contain = self.entry_must_contain.get().strip().lower()
-        dictionary_path = self.entry_dictionary_path.get().strip() or "words_alpha.txt"
-
-        logging.debug(f"Center: {center}, Other Letters: {other_letters}, Min Length: {min_length}, Max Length: {max_length}, Must Contain: {must_contain}, Dictionary Path: {dictionary_path}")
+        dictionary_path = self.entry_dictionary_path.get().strip() or "words.txt"
 
         if len(center) != 1 or len(other_letters) != 6:
             self.messagebox.showerror("Input Error", "Please provide exactly one center letter and six other letters.")
-            logging.error("Input Error: Please provide exactly one center letter and six other letters.")
+            logging.warning("Invalid input: Center letter length or other letters length incorrect.")
             return
 
         try:
@@ -250,22 +242,18 @@ class SpellingBeeGUI:
                 must_contain=must_contain,
             )
 
-            logging.debug(f"Valid Words: {valid_words}")
-
             self.result_text.delete(1.0, self.tk.END)
             for word, score in valid_words:
                 self.result_text.insert(self.tk.END, f"{word}\n")
 
-            stats = gather_statistics(valid_words, letters_set)
+            stats = gather_statistics(valid_words, letters_set)  # Pass letters_set
             self.label_total_words.config(text=f"Total Words: {stats['total_words']:,}")
             self.label_pangrams.config(text=f"Pangrams: {stats['pangrams_count']:,}")
             self.label_avg_length.config(text=f"Average Length: {int(stats['avg_length'])}")
             self.label_sum_scores.config(text=f"Sum of Scores: {stats['total_points']:.2f}")
-
-            logging.debug(f"Statistics: {stats}")
+            logging.info(f"Checked words with center '{center}' and letters '{other_letters}'.")
         except Exception as e:
-            self.messagebox.showerror("Error", f"An error occurred: {e}")
-            logging.error(f"An error occurred: {e}")
+            logging.error(f"Error checking words: {e}")
 
     def on_export_csv(self) -> None:
         """
@@ -279,19 +267,24 @@ class SpellingBeeGUI:
         must_contain = self.entry_must_contain.get().strip().lower()
         dictionary_path = self.entry_dictionary_path.get().strip() or "words.txt"
 
-        valid_words, letters_set = run_spelling_bee_query(
-            dictionary_path=dictionary_path,
-            center=center,
-            other_letters=other_letters,
-            min_length=min_length,
-            max_length=max_length,
-            must_contain=must_contain,
-        )
+        try:
+            valid_words, letters_set = run_spelling_bee_query(
+                dictionary_path=dictionary_path,
+                center=center,
+                other_letters=other_letters,
+                min_length=min_length,
+                max_length=max_length,
+                must_contain=must_contain,
+            )
 
-        export_to_csv(valid_words, letters_set, csv_path)
-        self.messagebox.showinfo("Export Success", f"Results successfully written to {csv_path}!")
+            export_to_csv(valid_words, letters_set, csv_path)
+            self.messagebox.showinfo("Export Success", f"Results successfully written to {csv_path}!")
+            logging.info(f"Exported results to {csv_path}.")
+        except Exception as e:
+            logging.error(f"Failed to export CSV: {e}")
+            self.messagebox.showerror("Export Failed", f"Failed to write CSV file: {e}")
 
-        stats = gather_statistics(valid_words, letters_set)
+        stats = gather_statistics(valid_words, letters_set)  # Pass letters_set
         self.label_total_words.config(text=f"Total Words: {stats['total_words']:,}")
         self.label_pangrams.config(text=f"Pangrams: {stats['pangrams_count']:,}")
         self.label_avg_length.config(text=f"Average Length: {int(stats['avg_length'])}")
@@ -326,3 +319,6 @@ class SpellingBeeGUI:
 
 if __name__ == "__main__":
     SpellingBeeGUI()
+
+# Ensure that SpellingBeeGUI is available for import
+__all__ = ['SpellingBeeGUI']

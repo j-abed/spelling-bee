@@ -1,0 +1,15 @@
+2025-01-25 20:06:18,837 [ERROR] Failed to load dictionary: [Errno 2] No such file or directory: 'test_words.txt'
+2025-01-25 20:06:29,570 [ERROR] Failed to load dictionary: [Errno 2] No such file or directory: 'test_words.txt'
+2025-01-25 20:06:40,359 [ERROR] Failed to load dictionary: [Errno 2] No such file or directory: 'test_words.txt'
+2025-01-25 20:06:51,060 [ERROR] Failed to load dictionary: [Errno 2] No such file or directory: 'test_words.txt'
+2025-01-25 20:07:01,713 [ERROR] Failed to load dictionary: [Errno 2] No such file or directory: 'test_words.txt'
+2025-01-25 20:07:32,903 [ERROR] Failed to load dictionary: [Errno 2] No such file or directory: 'test_words.txt'
+2025-01-25 20:24:36,238 [INFO] Spelling Bee application started.
+2025-01-25 20:26:32,551 [INFO] Spelling Bee application started.
+2025-01-25 20:27:56,102 [INFO] Spelling Bee application started.
+2025-01-25 20:30:41,071 [ERROR] Failed to write CSV file: SpellingBeeSolver.gather_statistics() missing 1 required positional argument: 'letters_set'
+2025-01-25 20:30:43,236 [INFO] Spelling Bee application terminated.
+2025-01-25 20:30:58,056 [INFO] Spelling Bee application started.
+2025-01-25 20:31:19,933 [INFO] Spelling Bee application terminated.
+2025-01-25 20:32:28,491 [INFO] Spelling Bee application started.
+2025-01-25 20:34:41,253 [INFO] Spelling Bee application started.
