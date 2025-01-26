@@ -1,5 +1,5 @@
-
 import csv
+import re
 import nltk
 from rich.console import Console
 from rich.table import Table
@@ -16,14 +16,10 @@ from nltk.corpus import gutenberg
 corpus = " ".join(gutenberg.words()).lower()
 
 # Remove non-alphabetic characters
-import re
 corpus = re.sub(r'[^a-z\s]', '', corpus)
 
-from collections import Counter
-
-# Bigram frequencies
+# Bigram and trigram frequencies
 bigram_freq = Counter(corpus[i:i+2] for i in range(len(corpus) - 1))
-# Trigram frequencies
 trigram_freq = Counter(corpus[i:i+3] for i in range(len(corpus) - 2))
 
 # ------------------------ GLOBAL CACHE ------------------------
@@ -36,10 +32,8 @@ def get_dictionary(dictionary_path: str):
     """
     global _DICTIONARY_CACHE
     if _DICTIONARY_CACHE is not None:
-        # Already loaded; no need to load again
         return _DICTIONARY_CACHE
     
-    # Otherwise, load from file
     try:
         with open(dictionary_path, 'r', encoding='utf-8') as f:
             words = [w.strip().lower() for w in f if w.strip()]
@@ -58,11 +52,7 @@ def is_valid_word(word: str, center: str, letters_set: set) -> bool:
       2. Contain the center letter at least once.
       3. Use only letters from the letters_set (no outside letters).
     """
-    if len(word) < 4:
-        return False
-    if center not in word:
-        return False
-    return all(char in letters_set for char in word)
+    return len(word) >= 4 and center in word and all(char in letters_set for char in word)
 
 def is_pangram(word: str, letters_set: set) -> bool:
     """
@@ -85,27 +75,25 @@ def trigram_score(word, trigram_freq):
 
 def combined_score(word, bigram_freq, trigram_freq, weight=0.5):
     """
-    Combine bigram and trigram scores with a weighted average.
+    Combine bigram and trigram scores with a weighted average and normalize by word length.
     """
     score_b = bigram_score(word, bigram_freq)
     score_t = trigram_score(word, trigram_freq)
-    return score_b * weight + score_t * (1 - weight)
+    combined = score_b * weight + score_t * (1 - weight)
+    return combined / len(word)  # Normalize by word length
 
-def compute_score(word: str, letters_set: set) -> int:
+def normalize_scores(valid_words):
     """
-    Compute a NYT Spelling Bee style score:
-      - 4-letter word => 1 point
-      - 5-letter word => 2 points
-      - 6-letter word => 3 points
-      - 7-letter word => 4 points
-      - etc. => word length - 3
-      - If the word is a pangram, add +7 bonus points.
+    Normalize scores to a scale of 0 to 100.
     """
-    # For words of length >= 4, score = (length - 3)
-    base_score = max(1, len(word) - 3)
-    if is_pangram(word, letters_set):
-        base_score += 7
-    return base_score
+    if not valid_words:
+        return valid_words
+
+    max_score = max(score for _, score in valid_words)
+    if max_score == 0:
+        return valid_words
+
+    return [(word, (score / max_score) * 100) for word, score in valid_words]
 
 def gather_statistics(valid_words, letters_set):
     """
@@ -126,18 +114,6 @@ def gather_statistics(valid_words, letters_set):
         "avg_length": avg_length,
         "total_points": total_points,
     }
-def is_valid_for_spelling_bee(word, letters, center_letter):
-    """
-    Check if a word is valid for Spelling Bee:
-    - Contains the center letter.
-    - Only uses the provided 7 letters.
-    - Has a minimum length of 4.
-    """
-    return (
-        len(word) >= 4 and
-        center_letter in word and
-        all(c in letters for c in word)
-    )
 
 def find_valid_words(letters, center_letter, dictionary, bigram_freq, trigram_freq):
     """
@@ -145,9 +121,8 @@ def find_valid_words(letters, center_letter, dictionary, bigram_freq, trigram_fr
     """
     candidates = [
         word for word in dictionary
-        if is_valid_for_spelling_bee(word, letters, center_letter)
+        if is_valid_word(word, center_letter, letters)
     ]
-    # Score and sort candidates
     scored_candidates = [
         (word, combined_score(word, bigram_freq, trigram_freq))
         for word in candidates
@@ -171,47 +146,36 @@ def find_spelling_bee_words(
        - must_contain (partial substring)
     4. Calculates each word's score and returns the list of (word, score).
     """
-    # Normalize letters to lowercase
     center = center.lower()
     other_letters = other_letters.lower()
-
-    # Build the set of 7 letters
     letters_set = set(center + other_letters)
-
-    # Get the dictionary (cached)
     word_list = get_dictionary(dictionary_path)
 
-    # Filter valid words and compute their scores
     valid_words = []
     for word in word_list:
         if not is_valid_word(word, center, letters_set):
             continue
-        # Check min_length
         if len(word) < min_length:
             continue
-        # Check max_length (if > 0 means we have a limit)
         if max_length > 0 and len(word) > max_length:
             continue
-        # Check must_contain substring
         if must_contain and must_contain.lower() not in word:
             continue
         
-        score = compute_score(word, letters_set)
+        score = combined_score(word, bigram_freq, trigram_freq)
         valid_words.append((word, score))
 
-    # Sort by descending score, then by descending word length, then alphabetical
     valid_words.sort(key=lambda ws: (-ws[1], -len(ws[0]), ws[0]))
+    valid_words = normalize_scores(valid_words)
 
     return valid_words, letters_set
 
-def print_results(valid_words, letters_set, dictionary_path, min_length, max_length, must_contain,center):
+def print_results(valid_words, letters_set, dictionary_path, min_length, max_length, must_contain, center):
     """
     Prints results in a rich-formatted table and summary statistics.
     """
-    # Gather additional statistics
     stats = gather_statistics(valid_words, letters_set)
 
-    # Build a Rich table
     table = Table(title="Spelling Bee Results")
     table.add_column("Word", justify="left", style="cyan", no_wrap=True)
     table.add_column("Score", justify="right", style="magenta")
@@ -219,9 +183,8 @@ def print_results(valid_words, letters_set, dictionary_path, min_length, max_len
 
     for (w, s) in valid_words:
         pangram_flag = "Yes" if is_pangram(w, letters_set) else ""
-        table.add_row(w, str(s), pangram_flag)
+        table.add_row(w, f"{s:.2f}", pangram_flag)
 
-    # Print summary info above the table
     console.print("============================================", style="bold yellow")
     console.print(f"Dictionary       : {dictionary_path}", style="bold white")
     console.print(f"Letters Used     : {', '.join(sorted(letters_set))} (Center = '{center}')", style="bold white")
@@ -235,7 +198,6 @@ def print_results(valid_words, letters_set, dictionary_path, min_length, max_len
     console.print(f"Sum of all scores: {stats['total_points']}", style="bold white")
     console.print("============================================", style="bold yellow")
 
-    # Print the table of words
     console.print(table)
 
 def export_to_csv(valid_words, letters_set, csv_path: str):
@@ -248,7 +210,7 @@ def export_to_csv(valid_words, letters_set, csv_path: str):
             writer.writerow(["word", "score", "pangram"])
             for (w, s) in valid_words:
                 pangram_flag = "Yes" if is_pangram(w, letters_set) else "No"
-                writer.writerow([w, s, pangram_flag])
+                writer.writerow([w, f"{s:.2f}", pangram_flag])
         console.print(f"\n[green]Results successfully written to {csv_path}![/green]")
     except Exception as e:
         console.print(f"[red]Failed to write CSV file: {e}[/red]")
@@ -261,40 +223,22 @@ def interactive_mode():
     """
     console.print("[bold yellow]Welcome to the Enhanced Spelling Bee Helper![/bold yellow]\n")
 
-    # Prompt for dictionary path
-    dictionary_path = console.input("Enter path to dictionary file [default: words.txt]: ")
-    if not dictionary_path.strip():
-        dictionary_path = "words.txt"  # fallback
+    # Default inputs
+    default_dictionary_path = "words_alpha.txt"
+    default_center = "f"
+    default_other_letters = "laping"
+    default_min_length = 4
+    default_max_length = 12
+    default_must_contain = ""
+
+    dictionary_path = console.input(f"Enter path to dictionary file [default: {default_dictionary_path}]: ") or default_dictionary_path
+    center = console.input(f"\nEnter the center letter (required) [default: {default_center}]: ").strip().lower() or default_center
+    other_letters = console.input(f"Enter the other 6 letters (required) [default: {default_other_letters}]: ").strip().lower() or default_other_letters
+    min_length = int(console.input(f"Minimum word length? [default: {default_min_length}]: ").strip() or default_min_length)
+    max_length = int(console.input(f"Maximum word length? [0 = no limit] [default: {default_max_length}]: ").strip() or default_max_length)
+    must_contain = console.input(f"Must contain substring (optional) [default: {default_must_contain}]: ").strip().lower() or default_must_contain
 
     while True:
-        # Prompt for center letter
-        center = console.input("\nEnter the center letter (required): ").strip().lower()
-        if not center or len(center) != 1:
-            console.print("[red]Please provide exactly one center letter.[/red]")
-            continue
-
-        # Prompt for other letters
-        other_letters = console.input("Enter the other 6 letters (required): ").strip().lower()
-        if len(other_letters) != 6:
-            console.print("[red]Please provide exactly six other letters.[/red]")
-            continue
-
-        # Prompt for min_length
-        min_length_str = console.input("Minimum word length? [default: 4]: ")
-        min_length = 4
-        if min_length_str.strip().isdigit():
-            min_length = int(min_length_str)
-
-        # Prompt for max_length
-        max_length_str = console.input("Maximum word length? [0 = no limit]: ")
-        max_length = 0
-        if max_length_str.strip().isdigit():
-            max_length = int(max_length_str)
-
-        # Prompt for must_contain substring
-        must_contain = console.input("Must contain substring (optional): ").strip().lower()
-
-        # -- Perform search --
         valid_words, letters_set = find_spelling_bee_words(
             dictionary_path=dictionary_path,
             center=center,
@@ -304,20 +248,13 @@ def interactive_mode():
             must_contain=must_contain,
         )
 
-        # -- Print results --
         print_results(valid_words, letters_set, dictionary_path, min_length, max_length, must_contain, center)
 
-        # Optional CSV export
-        csv_choice = console.input("Export to CSV? (y/n) [default: n]: ").lower()
-        if csv_choice.startswith("y"):
-            csv_path = console.input("Enter CSV file name [default: results.csv]: ")
-            if not csv_path.strip():
-                csv_path = "results.csv"
+        if console.input("Export to CSV? (y/n) [default: n]: ").strip().lower().startswith("y"):
+            csv_path = console.input("Enter CSV file name [default: results.csv]: ").strip() or "results.csv"
             export_to_csv(valid_words, letters_set, csv_path)
 
-        # Ask if the user wants to do another query or exit
-        again = console.input("\nDo you want to run another query? (y/n) [default: y]: ").lower()
-        if again.startswith("n"):
+        if console.input("\nDo you want to run another query? (y/n) [default: y]: ").strip().lower().startswith("n"):
             console.print("\n[bold green]Goodbye![/bold green]")
             break
 
@@ -325,28 +262,20 @@ def interactive_mode():
 
 def interactive_spelling_bee_solver():
     word_list = get_dictionary("words_alpha.txt")
-    # Get input from the user
-    letters_input = input("Enter all 7 letters (no spaces): ").strip().lower()
-    center_letter = input("Enter the center letter: ").strip().lower()
+    letters_input = console.input("Enter all 7 letters (no spaces): ").strip().lower()
+    center_letter = console.input("Enter the center letter: ").strip().lower()
 
-    # Convert letters to a set
     letters = set(letters_input)
 
-    # Find and rank valid words
-    results = find_valid_words(letters, center_letter, word_fondlist, bigram_freq, trigram_freq)
+    results = find_valid_words(letters, center_letter, word_list, bigram_freq, trigram_freq)
 
-    # Display top results
-    print("\nTop valid words:")
+    console.print("\n[bold yellow]Top valid words:[/bold yellow]")
     for word, score in results[:20]:  # Display top 20
-        print(f"{word} (score={score:.2f})")
+        console.print(f"{word} (score={score:.2f})", style="bold cyan")
 
 # ------------------------ MAIN ----------------------------------------#
 def main():
-    # Just run interactive mode in this example
-    # interactive_mode()
-
-    # Just run interactive_spelling_bee_solver()
-    interactive_spelling_bee_solver()
+    interactive_mode()
 
 if __name__ == "__main__":
     main()
