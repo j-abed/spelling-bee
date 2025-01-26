@@ -151,19 +151,14 @@ def find_spelling_bee_words(
     letters_set = set(center + other_letters)
     word_list = get_dictionary(dictionary_path)
 
-    valid_words = []
-    for word in word_list:
-        if not is_valid_word(word, center, letters_set):
-            continue
-        if len(word) < min_length:
-            continue
-        if max_length > 0 and len(word) > max_length:
-            continue
-        if must_contain and must_contain.lower() not in word:
-            continue
-        
-        score = combined_score(word, bigram_freq, trigram_freq)
-        valid_words.append((word, score))
+    valid_words = [
+        (word, combined_score(word, bigram_freq, trigram_freq))
+        for word in word_list
+        if is_valid_word(word, center, letters_set)
+        and len(word) >= min_length
+        and (max_length == 0 or len(word) <= max_length)
+        and (not must_contain or must_contain.lower() in word)
+    ]
 
     valid_words.sort(key=lambda ws: (-ws[1], -len(ws[0]), ws[0]))
     valid_words = normalize_scores(valid_words)
@@ -194,8 +189,7 @@ def print_results(valid_words, letters_set, dictionary_path, min_length, max_len
     console.print("============================================", style="bold yellow")
     console.print(f"Total words      : {stats['total_words']}", style="bold white")
     console.print(f"Number pangrams  : {stats['pangrams_count']}", style="bold white")
-    console.print(f"Average length   : {stats['avg_length']:.2f}", style="bold white")
-    console.print(f"Sum of all scores: {stats['total_points']}", style="bold white")
+    console.print(f"Average length   : {stats['avg_length']:.0f}", style="bold white")
     console.print("============================================", style="bold yellow")
 
     console.print(table)

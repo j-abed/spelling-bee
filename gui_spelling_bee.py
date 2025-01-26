@@ -30,7 +30,7 @@ def on_check_words():
 
     result_text.delete(1.0, tk.END)
     for word, score in valid_words:
-        result_text.insert(tk.END, f"{word} (Score: {score})\n")
+        result_text.insert(tk.END, f"{word} (Score: {score:.2f})\n")
 
 def on_export_csv():
     csv_path = entry_csv_path.get().strip() or "results.csv"
