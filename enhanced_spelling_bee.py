@@ -189,7 +189,8 @@ def print_results(valid_words, letters_set, dictionary_path, min_length, max_len
     console.print("============================================", style="bold yellow")
     console.print(f"Total words      : {stats['total_words']}", style="bold white")
     console.print(f"Number pangrams  : {stats['pangrams_count']}", style="bold white")
-    console.print(f"Average length   : {stats['avg_length']:.0f}", style="bold white")
+    console.print(f"Average length   : {stats['avg_length']:.2f}", style="bold white")
+    console.print(f"Sum of all scores: {stats['total_points']}", style="bold white")
     console.print("============================================", style="bold yellow")
 
     console.print(table)
@@ -208,69 +209,4 @@ def export_to_csv(valid_words, letters_set, csv_path: str):
         console.print(f"\n[green]Results successfully written to {csv_path}![/green]")
     except Exception as e:
         console.print(f"[red]Failed to write CSV file: {e}[/red]")
-
-# ------------------------ INTERACTIVE MODE ------------------------
-
-def interactive_mode():
-    """
-    Runs an interactive session to collect user inputs and display Spelling Bee results.
-    """
-    console.print("[bold yellow]Welcome to the Enhanced Spelling Bee Helper![/bold yellow]\n")
-
-    # Default inputs
-    default_dictionary_path = "words_alpha.txt"
-    default_center = "f"
-    default_other_letters = "laping"
-    default_min_length = 4
-    default_max_length = 12
-    default_must_contain = ""
-
-    dictionary_path = console.input(f"Enter path to dictionary file [default: {default_dictionary_path}]: ") or default_dictionary_path
-    center = console.input(f"\nEnter the center letter (required) [default: {default_center}]: ").strip().lower() or default_center
-    other_letters = console.input(f"Enter the other 6 letters (required) [default: {default_other_letters}]: ").strip().lower() or default_other_letters
-    min_length = int(console.input(f"Minimum word length? [default: {default_min_length}]: ").strip() or default_min_length)
-    max_length = int(console.input(f"Maximum word length? [0 = no limit] [default: {default_max_length}]: ").strip() or default_max_length)
-    must_contain = console.input(f"Must contain substring (optional) [default: {default_must_contain}]: ").strip().lower() or default_must_contain
-
-    while True:
-        valid_words, letters_set = find_spelling_bee_words(
-            dictionary_path=dictionary_path,
-            center=center,
-            other_letters=other_letters,
-            min_length=min_length,
-            max_length=max_length,
-            must_contain=must_contain,
-        )
-
-        print_results(valid_words, letters_set, dictionary_path, min_length, max_length, must_contain, center)
-
-        if console.input("Export to CSV? (y/n) [default: n]: ").strip().lower().startswith("y"):
-            csv_path = console.input("Enter CSV file name [default: results.csv]: ").strip() or "results.csv"
-            export_to_csv(valid_words, letters_set, csv_path)
-
-        if console.input("\nDo you want to run another query? (y/n) [default: y]: ").strip().lower().startswith("n"):
-            console.print("\n[bold green]Goodbye![/bold green]")
-            break
-
-#-------------------------Interactive Mode II --------------------------#
-
-def interactive_spelling_bee_solver():
-    word_list = get_dictionary("words_alpha.txt")
-    letters_input = console.input("Enter all 7 letters (no spaces): ").strip().lower()
-    center_letter = console.input("Enter the center letter: ").strip().lower()
-
-    letters = set(letters_input)
-
-    results = find_valid_words(letters, center_letter, word_list, bigram_freq, trigram_freq)
-
-    console.print("\n[bold yellow]Top valid words:[/bold yellow]")
-    for word, score in results[:20]:  # Display top 20
-        console.print(f"{word} (score={score:.2f})", style="bold cyan")
-
-# ------------------------ MAIN ----------------------------------------#
-def main():
-    interactive_mode()
-
-if __name__ == "__main__":
-    main()
 
